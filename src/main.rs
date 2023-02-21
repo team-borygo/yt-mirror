@@ -1,6 +1,7 @@
 use std::{path::Path};
 
 use anyhow::Result;
+use downloader::download_yt;
 use types::{Process, ProcessState};
 
 use crate::{api::cli::{Cli, CliCommand}, library::{chromium_library::ChromiumLibrary, Library}, youtube::get_youtube_video_id, types::Bookmark, process_repository::ProcessRepository};
@@ -10,6 +11,7 @@ mod library;
 mod types;
 mod youtube;
 mod process_repository;
+mod downloader;
 
 fn main() -> Result<()> {
     let cli = Cli {};
