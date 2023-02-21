@@ -1,5 +1,6 @@
-use std::{fs, io::Result};
+use std::{fs};
 
+use anyhow::Result;
 use serde::{Serialize, Deserialize};
 
 use crate::types::Bookmark;
@@ -9,7 +10,8 @@ use super::Library;
 pub struct ChromiumLibrary;
 
 impl Library for ChromiumLibrary {
-    fn get_bookmarks(path: &std::path::Path) -> Result<Vec<Bookmark>> {
+    fn get_bookmarks(&self, path: &std::path::Path) -> Result<Vec<Bookmark>> {
+        println!("{:?}", path);
         let data = fs::read_to_string(path)?;
         let json = serde_json::from_str(&data)?;
 

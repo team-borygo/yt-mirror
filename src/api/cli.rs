@@ -12,7 +12,7 @@ impl Cli {
 #[command(author, version, about)]
 pub struct CliProgram {
   #[command(subcommand)]
-  command: CliCommand,
+  pub command: CliCommand,
 }
 
 #[derive(Subcommand)]

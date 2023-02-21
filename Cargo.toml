@@ -4,6 +4,7 @@ version = "1.0.1"
 edition = "2021"
 
 [dependencies]
+anyhow = "1.0.69"
 async-channel = "1.8.0"
 clap = { version = "4.1.6", features = ["derive"] }
 rusqlite = { version = "0.28.0", features = ["bundled"] }

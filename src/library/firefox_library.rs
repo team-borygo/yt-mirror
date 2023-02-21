@@ -1,3 +1,5 @@
+use anyhow::Result;
+
 use crate::types::Bookmark;
 
 use super::Library;
@@ -5,7 +7,7 @@ use super::Library;
 pub struct FirefoxLibrary;
 
 impl Library for FirefoxLibrary {
-    fn get_bookmarks(path: &std::path::Path) -> Result<Vec<Bookmark>, std::io::Error> {
+    fn get_bookmarks(&self, path: &std::path::Path) -> Result<Vec<Bookmark>> {
         todo!()
     }
 }
