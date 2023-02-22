@@ -1,7 +1,7 @@
-use std::{path::Path};
+use std::{path::Path, thread::{self, JoinHandle}, time};
 
 use anyhow::Result;
-use downloader::download_yt;
+use downloader::{download_yt, Downloader};
 use types::{Process, ProcessState};
 
 use crate::{api::cli::{Cli, CliCommand}, library::{chromium_library::ChromiumLibrary, Library}, youtube::get_youtube_video_id, types::Bookmark, process_repository::ProcessRepository};
@@ -68,7 +68,51 @@ fn command_synchronize(
     tmp: String,
     filter: Option<String>,
 ) -> Result<()> {
-    todo!()
+    let process_repository = ProcessRepository::new(&processes)?;
+
+    let pending = process_repository.get_by_state(ProcessState::Pending)?;
+
+    let (process_channel_s, process_channel_r) = crossbeam_channel::unbounded();
+    let (result_channel_s, result_channel_r) = crossbeam_channel::unbounded();
+
+    for p in &pending[0..2] {
+        process_channel_s.send(p.youtube_id.clone())?;
+    }
+
+    let downloader_count = 2;
+
+    let mut handles = vec![];
+
+    for _ in 0..downloader_count {
+        let downloader = Downloader::new(
+            process_channel_r.clone(),
+            result_channel_s.clone(),
+            target.clone(),
+            tmp.clone(),
+            filter.clone()
+        );
+        let handle = thread::spawn(move || {
+            downloader.start();
+        });
+
+        handles.push(handle);
+    }
+
+    // This way after all messages are processed it will stop downloaders
+    drop(process_channel_s);
+
+    // TODO: HOW TO STOP RECEIVING MESSAGES, any drop doesn't work
+    while let Ok(result) = result_channel_r.recv() {
+        dbg!(result);
+
+        if handles.iter().all(|h| h.is_finished()) {
+            break;
+        }
+
+        thread::sleep(time::Duration::from_millis(2000))
+    }
+
+    Ok(())
 }
 
 fn command_failed(

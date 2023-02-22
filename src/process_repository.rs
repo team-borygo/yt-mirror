@@ -58,7 +58,7 @@ impl ProcessRepository {
 
     pub fn get_all(&self) -> Result<Vec<Process>> {
         let mut stmt = self.connection.prepare(
-            "SELECT youtubeId, state, errorMessage FROM process"
+            "SELECT youtube_id, state, error_message FROM process"
         )?;
 
         let iter = stmt.query_map([], |row| {
@@ -74,7 +74,7 @@ impl ProcessRepository {
 
     pub fn get_by_state(&self, state: ProcessState) -> Result<Vec<Process>> {
         let mut stmt = self.connection.prepare(
-            "SELECT youtubeId, state, errorMessage FROM process WHERE state = (?1)"
+            "SELECT youtube_id, state, error_message FROM process WHERE state = (?1)"
         )?;
 
         let iter = stmt.query_map([state], |row| {
@@ -90,21 +90,21 @@ impl ProcessRepository {
 
     pub fn finish(&self, id: &str) -> () {
         self.connection.execute(
-            "UPDATE process SET state = (?1) WHERE youtubeId = (?2)",
+            "UPDATE process SET state = (?1) WHERE youtube_id = (?2)",
             (id.clone(), ProcessState::Finished)
         ).expect("Marking process as failed was not successful");
     }
 
     pub fn fail(&self, id: &str) -> () {
         self.connection.execute(
-            "UPDATE process SET state = (?1) WHERE youtubeId = (?2)",
+            "UPDATE process SET state = (?1) WHERE youtube_id = (?2)",
             (id.clone(), ProcessState::Failed)
         ).expect("Marking process as failed was not successful");
     }
 
     pub fn skip(&self, id: &str) -> () {
         self.connection.execute(
-            "UPDATE process SET state = (?1) WHERE youtubeId = (?2)",
+            "UPDATE process SET state = (?1) WHERE youtube_id = (?2)",
             (id.clone(), ProcessState::Skipped)
         ).expect("Marking process as skipped was not successful");
     }

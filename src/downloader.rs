@@ -1,18 +1,27 @@
-use std::process::{Command};
+use std::{process::{Command}};
 
 use anyhow::{Result};
+use crossbeam_channel::{Receiver, Sender};
+use nanoid::nanoid;
 
+#[derive(Debug)]
 pub enum DownloadStatus {
     DownloadSkipped { youtube_id: String },
     DownloadFailed { youtube_id: String, error_message: String },
     DownloadFinished { youtube_id: String },
 }
 
+#[derive(Debug)]
+pub struct DownloaderResult {
+    pub actor_id: String,
+    pub status: DownloadStatus,
+}
+
 pub fn download_yt(
     youtube_id: String,
-    target_dir: String,
-    tmp_dir: String,
-    match_filter: Option<String>,
+    target_dir: &str,
+    tmp_dir: &str,
+    match_filter: &Option<String>,
 ) -> Result<DownloadStatus> {
     let output = {
         if cfg!(target_os = "windows") {
@@ -29,7 +38,7 @@ pub fn download_yt(
 
             if let Some(filter) = match_filter {
                 args.push("--match-filter".to_string());
-                args.push(filter);
+                args.push(filter.to_string());
             }
 
             args.push("--".to_string());
@@ -53,5 +62,60 @@ pub fn download_yt(
         }
     } else {
         Ok(DownloadStatus::DownloadFailed { youtube_id, error_message: stderr })
+    }
+}
+
+pub struct Downloader {
+    id: String,
+    work_channel: Receiver<String>,
+    result_channel: Sender<DownloaderResult>,
+    target: String,
+    tmp: String,
+    filter: Option<String>
+}
+
+impl Downloader {
+    pub fn new(
+        work_channel: Receiver<String>,
+        result_channel: Sender<DownloaderResult>,
+        target: String,
+        tmp: String,
+        filter: Option<String>
+    ) -> Self {
+        Downloader {
+            id: nanoid!(5),
+            work_channel,
+            result_channel,
+            target,
+            tmp,
+            filter,
+        }
+    }
+
+    pub fn start(&self) -> () {
+        while let Ok(youtube_id) = self.work_channel.recv() {
+            let result = download_yt(
+                youtube_id,
+                &self.target,
+                &self.tmp,
+                &self.filter
+            );
+            
+            match result {
+                Ok(status) => {
+                    let result = DownloaderResult {
+                        actor_id: self.id.to_string(),
+                        status,
+                    };
+
+                    self.result_channel.send(result).expect(
+                        "Cannot send download result to result channel"
+                    );
+                }
+                Err(_) => {
+                    todo!()
+                }
+            }
+        }
     }
 }
