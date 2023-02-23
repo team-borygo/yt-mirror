@@ -1,10 +1,10 @@
-use std::{path::Path, thread::{self, JoinHandle}, time};
+use std::{path::Path, thread::{self}, time};
 
 use anyhow::Result;
-use downloader::{download_yt, Downloader};
+use downloader::{Downloader};
 use types::{Process, ProcessState};
 
-use crate::{api::cli::{Cli, CliCommand}, library::{chromium_library::ChromiumLibrary, Library}, youtube::get_youtube_video_id, types::Bookmark, process_repository::ProcessRepository};
+use crate::{api::cli::{Cli, CliCommand}, library::{chromium_library::ChromiumLibrary, Library}, youtube::get_youtube_video_id, types::Bookmark, process_repository::ProcessRepository, downloader::DownloadStatus};
 
 mod api;
 mod library;
@@ -75,8 +75,8 @@ fn command_synchronize(
     let (process_channel_s, process_channel_r) = crossbeam_channel::unbounded();
     let (result_channel_s, result_channel_r) = crossbeam_channel::unbounded();
 
-    for p in &pending[0..2] {
-        process_channel_s.send(p.youtube_id.clone())?;
+    for p in pending {
+        process_channel_s.send(p.youtube_id)?;
     }
 
     let downloader_count = 2;
@@ -101,15 +101,28 @@ fn command_synchronize(
     // This way after all messages are processed it will stop downloaders
     drop(process_channel_s);
 
-    // TODO: HOW TO STOP RECEIVING MESSAGES, any drop doesn't work
     while let Ok(result) = result_channel_r.recv() {
-        dbg!(result);
-
-        if handles.iter().all(|h| h.is_finished()) {
-            break;
+        match &result.status {
+            DownloadStatus::DownloadFailed { youtube_id, error_message } => {
+                process_repository.fail(&youtube_id, &error_message)
+            }
+            DownloadStatus::DownloadFinished { youtube_id } => {
+                process_repository.finish(&youtube_id);
+            }
+            DownloadStatus::DownloadSkipped { youtube_id } => {
+                process_repository.skip(&youtube_id);
+            }
         }
 
-        thread::sleep(time::Duration::from_millis(2000))
+        dbg!(result);
+
+        // This is not the best solution to quit this loop
+        // but I don't know why the channel disconnects
+        let is_workers_done = handles.iter().all(|h| h.is_finished());
+        let is_channel_empty = result_channel_r.is_empty();
+        if is_workers_done && is_channel_empty {
+            break;
+        }
     }
 
     Ok(())

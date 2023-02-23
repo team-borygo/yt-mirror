@@ -91,21 +91,21 @@ impl ProcessRepository {
     pub fn finish(&self, id: &str) -> () {
         self.connection.execute(
             "UPDATE process SET state = (?1) WHERE youtube_id = (?2)",
-            (id.clone(), ProcessState::Finished)
+            (ProcessState::Finished, id.clone())
         ).expect("Marking process as failed was not successful");
     }
 
-    pub fn fail(&self, id: &str) -> () {
+    pub fn fail(&self, id: &str, error: &str) -> () {
         self.connection.execute(
-            "UPDATE process SET state = (?1) WHERE youtube_id = (?2)",
-            (id.clone(), ProcessState::Failed)
+            "UPDATE process SET state = (?1), error_message = (?2) WHERE youtube_id = (?3)",
+            (ProcessState::Failed, error.clone(), id.clone())
         ).expect("Marking process as failed was not successful");
     }
 
     pub fn skip(&self, id: &str) -> () {
         self.connection.execute(
             "UPDATE process SET state = (?1) WHERE youtube_id = (?2)",
-            (id.clone(), ProcessState::Skipped)
+            (ProcessState::Skipped, id.clone())
         ).expect("Marking process as skipped was not successful");
     }
 
