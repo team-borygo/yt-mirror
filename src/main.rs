@@ -79,7 +79,7 @@ fn command_synchronize(
         process_channel_s.send(p.youtube_id)?;
     }
 
-    let downloader_count = 2;
+    let downloader_count = 10;
 
     let mut handles = vec![];
 
@@ -132,7 +132,23 @@ fn command_failed(
     processes: String,
     short: bool
 ) -> Result<()> {
-    todo!()
+    let process_repository = ProcessRepository::new(&processes)?;
+
+    let pending = process_repository.get_by_state(ProcessState::Failed)?;
+
+    for process in pending {
+        if short {
+            println!("{}", process.youtube_id);
+        } else {
+            println!(
+                "{} | {}",
+                process.youtube_id,
+                process.error.unwrap_or("".to_string())
+            );
+        }
+    }
+
+    Ok(())
 }
 
 fn bookmark_to_process(_bookmark: &Bookmark, youtube_id: String) -> Process {
