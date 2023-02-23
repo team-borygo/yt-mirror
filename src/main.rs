@@ -1,7 +1,8 @@
-use std::{path::Path, thread::{self}, time};
+use std::{path::Path, thread::{self}, time, panic};
 
 use anyhow::Result;
 use downloader::{Downloader};
+use library::firefox_library::FirefoxLibrary;
 use types::{Process, ProcessState};
 
 use crate::{api::cli::{Cli, CliCommand}, library::{chromium_library::ChromiumLibrary, Library}, youtube::get_youtube_video_id, types::Bookmark, process_repository::ProcessRepository, downloader::DownloadStatus};
@@ -39,11 +40,14 @@ fn command_prepare(
     processes: String,
     bookmarks: String
 ) -> Result<()> {
-    // TODO: add support for different bookmarks
-    // "Bookmarks" -> loadBookmarks $ CR.ChromeRepository bookmarksPath
-    // "Bookmarks.json" -> loadBookmarks $ CR.ChromeRepository bookmarksPath
-    // "places.sqlite" -> loadBookmarks $ FR.FirefoxRepository bookmarksPath
-    let library: Box<dyn Library> = Box::new(ChromiumLibrary {});
+    let bookmarks_file = Path::new(&bookmarks).file_name().and_then(|f| f.to_str());
+
+    let library: Box<dyn Library> = match bookmarks_file {
+        Some("Bookmarks") => Box::new(ChromiumLibrary {}),
+        Some("Bookmarks.json") => Box::new(ChromiumLibrary {}),
+        Some("places.sqlite") => Box::new(FirefoxLibrary {}),
+        _ => todo!()
+    };
 
     let process_list: Vec<Process> = library
         .get_bookmarks(Path::new(&bookmarks))?
