@@ -1,28 +1,14 @@
 use std::{
     collections::HashMap,
-    io::{self, Stdout},
     path::Path,
     thread::{self},
-    time::Duration,
 };
 
 use anyhow::Result;
-use crossterm::{
-    event::{poll, read, DisableMouseCapture, Event, KeyCode, KeyEvent, KeyModifiers},
-    execute,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
-};
 use downloader::{Downloader, DownloaderState};
 use library::firefox_library::FirefoxLibrary;
-use tui::{
-    backend::{Backend, CrosstermBackend},
-    layout::{Constraint, Direction, Layout},
-    style::{Color, Style},
-    text::{Span, Spans},
-    widgets::{Block, Borders, Gauge, List, ListItem, Paragraph},
-    Frame, Terminal,
-};
 use types::{Process, ProcessState};
+use ui::{close_ui, draw_ui, prepare_ui, should_quit};
 
 use crate::{
     api::cli::{Cli, CliCommand},
@@ -38,6 +24,7 @@ mod downloader;
 mod library;
 mod process_repository;
 mod types;
+mod ui;
 mod youtube;
 
 fn main() -> Result<()> {
@@ -57,88 +44,6 @@ fn main() -> Result<()> {
         } => command_synchronize(processes, target, tmp, filter),
         CliCommand::Failed { processes, short } => command_failed(processes, short),
     }
-}
-
-fn draw_ui<B: Backend>(
-    f: &mut Frame<B>,
-    downloader_states: &HashMap<String, DownloaderState>,
-    results: &Vec<DownloadResult>,
-) -> () {
-    let root = Layout::default()
-        .direction(Direction::Vertical)
-        .margin(1)
-        .constraints([Constraint::Length(3), Constraint::Percentage(100)].as_ref())
-        .split(f.size());
-
-    let layout = Layout::default()
-        .direction(Direction::Horizontal)
-        .margin(1)
-        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
-        .split(root[1]);
-
-    let progress_block = Gauge::default()
-        .block(Block::default().borders(Borders::ALL).title("Progress"))
-        .gauge_style(Style::default().fg(Color::White).bg(Color::Black))
-        .percent(20);
-
-    let actors_column_text: Vec<Spans> = downloader_states
-        .values()
-        .map(|state| match state {
-            DownloaderState::Downloading {
-                downloader_id,
-                youtube_id,
-            } => format!("{}: Downloading {}", downloader_id, youtube_id).to_string(),
-            DownloaderState::Finished { downloader_id } => {
-                format!("{}: Finished", downloader_id).to_string()
-            }
-            DownloaderState::Waiting { downloader_id } => {
-                format!("{}: Waiting", downloader_id).to_string()
-            }
-            DownloaderState::Crashed { downloader_id } => {
-                format!("{}: Crashed", downloader_id).to_string()
-            }
-        })
-        .map(|str| Spans::from(Span::raw(str)))
-        .collect();
-
-    let results_column_text: Vec<ListItem> = results
-        .iter()
-        .map(|result| match result {
-            DownloadResult::DownloadSkipped {
-                downloader_id,
-                youtube_id,
-            } => {
-                format!("{} skipped {}", downloader_id, youtube_id)
-            }
-            DownloadResult::DownloadFailed {
-                downloader_id,
-                youtube_id,
-                error_message,
-            } => {
-                format!(
-                    "{} failed {} because {}",
-                    downloader_id, youtube_id, error_message
-                )
-            }
-            DownloadResult::DownloadFinished {
-                downloader_id,
-                youtube_id,
-            } => {
-                format!("{} finished {}", downloader_id, youtube_id)
-            }
-        })
-        .map(|str| ListItem::new(vec![Spans::from(Span::raw(str))]))
-        .collect();
-
-    let actor_block = Paragraph::new(actors_column_text)
-        .block(Block::default().title("Downloaders").borders(Borders::ALL));
-
-    let results_block = List::new(results_column_text)
-        .block(Block::default().title("Results").borders(Borders::ALL));
-
-    f.render_widget(progress_block, root[0]);
-    f.render_widget(results_block, layout[0]);
-    f.render_widget(actor_block, layout[1]);
 }
 
 fn command_prepare(processes: String, bookmarks: String) -> Result<()> {
@@ -205,14 +110,10 @@ fn command_synchronize(
         handles.push(handle);
     }
 
-    // This way after all messages are processed it will stop downloaders
+    // This way after all messages are processed it will stop downloader threads
     drop(process_channel_s);
 
-    enable_raw_mode()?;
-    let mut stdout = io::stdout();
-    execute!(stdout, EnterAlternateScreen)?;
-    let backend = CrosstermBackend::new(stdout);
-    let mut terminal = Terminal::new(backend)?;
+    let mut terminal = prepare_ui()?;
 
     let mut downloader_states: HashMap<String, DownloaderState> = HashMap::new();
     let mut results: Vec<DownloadResult> = vec![];
@@ -222,20 +123,8 @@ fn command_synchronize(
     while let Ok(message) = message_channel_r.recv() {
         terminal.draw(|f| draw_ui(f, &downloader_states, &results))?;
 
-        if poll(Duration::from_millis(0))? {
-            let event = read()?;
-
-            match event {
-                Event::Key(KeyEvent {
-                    code: KeyCode::Esc, ..
-                }) => break,
-                Event::Key(KeyEvent {
-                    modifiers: KeyModifiers::CONTROL,
-                    code: KeyCode::Char('c'),
-                    ..
-                }) => break,
-                _ => {}
-            }
+        if should_quit()? {
+            break;
         }
 
         match message {
@@ -285,9 +174,7 @@ fn command_synchronize(
         }
     }
 
-    disable_raw_mode()?;
-    execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
-    terminal.show_cursor()?;
+    close_ui(terminal)?;
 
     Ok(())
 }
