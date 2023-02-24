@@ -63,6 +63,7 @@ pub fn draw_ui<B: Backend>(
     f: &mut Frame<B>,
     downloader_states: &HashMap<String, DownloaderState>,
     results: &Vec<DownloadResult>,
+    progress: &(u32, u32),
 ) -> () {
     let root = Layout::default()
         .direction(Direction::Vertical)
@@ -77,9 +78,14 @@ pub fn draw_ui<B: Backend>(
         .split(root[1]);
 
     let progress_block = Gauge::default()
-        .block(Block::default().borders(Borders::ALL).title("Progress"))
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title("Download progress"),
+        )
         .gauge_style(Style::default().fg(Color::White).bg(Color::Black))
-        .percent(20);
+        .label(format!("{} / {}", progress.0, progress.1))
+        .ratio(progress.0 as f64 / progress.1 as f64);
 
     let actors_column_text: Vec<Spans> = downloader_states
         .values()

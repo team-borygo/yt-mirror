@@ -82,6 +82,7 @@ fn command_synchronize(
     let process_repository = ProcessRepository::new(&processes)?;
 
     let pending = process_repository.get_by_state(ProcessState::Pending)?;
+    let pending_count = pending.len();
 
     let (process_channel_s, process_channel_r) = crossbeam_channel::unbounded();
     let (message_channel_is, message_channel_r) = crossbeam_channel::unbounded();
@@ -117,11 +118,12 @@ fn command_synchronize(
 
     let mut downloader_states: HashMap<String, DownloaderState> = HashMap::new();
     let mut results: Vec<DownloadResult> = vec![];
+    let mut progress: (u32, u32) = (0, pending_count.try_into()?);
 
-    terminal.draw(|f| draw_ui(f, &downloader_states, &results))?;
+    terminal.draw(|f| draw_ui(f, &downloader_states, &results, &progress))?;
 
     while let Ok(message) = message_channel_r.recv() {
-        terminal.draw(|f| draw_ui(f, &downloader_states, &results))?;
+        terminal.draw(|f| draw_ui(f, &downloader_states, &results, &progress))?;
 
         if should_quit()? {
             break;
@@ -129,6 +131,8 @@ fn command_synchronize(
 
         match message {
             DownloaderMessage::Result(result) => {
+                progress.0 += 1;
+
                 let result_clone = result.clone();
                 results.insert(0, result_clone);
 
