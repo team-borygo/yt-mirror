@@ -114,26 +114,34 @@ pub fn draw_ui<B: Backend>(
                 downloader_id,
                 youtube_id,
             } => {
-                format!("{} skipped {}", downloader_id, youtube_id)
+                let style = Style::default().fg(Color::Gray);
+                Span::styled(format!("{} skipped {}", downloader_id, youtube_id), style)
             }
             DownloadResult::DownloadFailed {
                 downloader_id,
                 youtube_id,
                 error_message,
             } => {
-                format!(
-                    "{} failed {} because {}",
-                    downloader_id, youtube_id, error_message
+                let style = Style::default().fg(Color::Red);
+
+                Span::styled(
+                    format!(
+                        "{} failed {} because {}",
+                        downloader_id, youtube_id, error_message
+                    ),
+                    style,
                 )
             }
             DownloadResult::DownloadFinished {
                 downloader_id,
                 youtube_id,
             } => {
-                format!("{} finished {}", downloader_id, youtube_id)
+                let style = Style::default().fg(Color::Green);
+
+                Span::styled(format!("{} finished {}", downloader_id, youtube_id), style)
             }
         })
-        .map(|str| ListItem::new(vec![Spans::from(Span::raw(str))]))
+        .map(|span| ListItem::new(vec![Spans::from(span)]))
         .collect();
 
     let actor_block = Paragraph::new(actors_column_text)
