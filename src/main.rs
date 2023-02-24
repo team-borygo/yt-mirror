@@ -1,6 +1,6 @@
 use std::{
     collections::HashMap,
-    io,
+    io::{self, Stdout},
     path::Path,
     thread::{self},
     time::Duration,
@@ -8,25 +8,25 @@ use std::{
 
 use anyhow::Result;
 use crossterm::{
-    event::DisableMouseCapture,
+    event::{poll, read, DisableMouseCapture, Event, KeyCode, KeyEvent, KeyModifiers},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
 use downloader::{Downloader, DownloaderState};
 use library::firefox_library::FirefoxLibrary;
 use tui::{
-    backend::CrosstermBackend,
+    backend::{Backend, CrosstermBackend},
     layout::{Constraint, Direction, Layout},
-    style::{Color, Modifier, Style},
+    style::{Color, Style},
     text::{Span, Spans},
-    widgets::{Block, Borders, Gauge, Paragraph},
-    Terminal,
+    widgets::{Block, Borders, Gauge, List, ListItem, Paragraph},
+    Frame, Terminal,
 };
 use types::{Process, ProcessState};
 
 use crate::{
     api::cli::{Cli, CliCommand},
-    downloader::DownloadStatus,
+    downloader::{DownloadResult, DownloaderMessage},
     library::{chromium_library::ChromiumLibrary, Library},
     process_repository::ProcessRepository,
     types::Bookmark,
@@ -41,10 +41,6 @@ mod types;
 mod youtube;
 
 fn main() -> Result<()> {
-    draw_ui()?;
-
-    return Ok(());
-
     let cli = Cli {};
     let program = cli.run();
 
@@ -63,62 +59,86 @@ fn main() -> Result<()> {
     }
 }
 
-fn draw_ui() -> Result<()> {
-    enable_raw_mode()?;
-    let mut stdout = io::stdout();
-    execute!(stdout, EnterAlternateScreen)?;
-    let backend = CrosstermBackend::new(stdout);
-    let mut terminal = Terminal::new(backend)?;
+fn draw_ui<B: Backend>(
+    f: &mut Frame<B>,
+    downloader_states: &HashMap<String, DownloaderState>,
+    results: &Vec<DownloadResult>,
+) -> () {
+    let root = Layout::default()
+        .direction(Direction::Vertical)
+        .margin(1)
+        .constraints([Constraint::Length(3), Constraint::Percentage(100)].as_ref())
+        .split(f.size());
 
-    let mut downloader_states: HashMap<String, DownloaderState> = HashMap::new();
+    let layout = Layout::default()
+        .direction(Direction::Horizontal)
+        .margin(1)
+        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
+        .split(root[1]);
 
-    terminal.draw(|f| {
-        let layout = Layout::default()
-            .direction(Direction::Vertical)
-            .margin(1)
-            .constraints([Constraint::Length(3), Constraint::Percentage(100)].as_ref())
-            .split(f.size());
+    let progress_block = Gauge::default()
+        .block(Block::default().borders(Borders::ALL).title("Progress"))
+        .gauge_style(Style::default().fg(Color::White).bg(Color::Black))
+        .percent(20);
 
-        let progress_block = Gauge::default()
-            .block(Block::default().borders(Borders::ALL).title("Progress"))
-            .gauge_style(Style::default().fg(Color::White).bg(Color::Black))
-            .percent(20);
+    let actors_column_text: Vec<Spans> = downloader_states
+        .values()
+        .map(|state| match state {
+            DownloaderState::Downloading {
+                downloader_id,
+                youtube_id,
+            } => format!("{}: Downloading {}", downloader_id, youtube_id).to_string(),
+            DownloaderState::Finished { downloader_id } => {
+                format!("{}: Finished", downloader_id).to_string()
+            }
+            DownloaderState::Waiting { downloader_id } => {
+                format!("{}: Waiting", downloader_id).to_string()
+            }
+            DownloaderState::Crashed { downloader_id } => {
+                format!("{}: Crashed", downloader_id).to_string()
+            }
+        })
+        .map(|str| Spans::from(Span::raw(str)))
+        .collect();
 
-        let actors_column_text: Vec<Spans> = downloader_states
-            .values()
-            .map(|state| match state {
-                DownloaderState::Downloading {
-                    downloader_id,
-                    youtube_id,
-                } => format!("{}: Downloading {}", downloader_id, youtube_id).to_string(),
-                DownloaderState::Finished { downloader_id } => {
-                    format!("{}: Finished", downloader_id).to_string()
-                }
-                DownloaderState::Waiting { downloader_id } => {
-                    format!("{}: Waiting", downloader_id).to_string()
-                }
-            })
-            .map(|str| Spans::from(Span::raw(str)))
-            .collect();
+    let results_column_text: Vec<ListItem> = results
+        .iter()
+        .map(|result| match result {
+            DownloadResult::DownloadSkipped {
+                downloader_id,
+                youtube_id,
+            } => {
+                format!("{} skipped {}", downloader_id, youtube_id)
+            }
+            DownloadResult::DownloadFailed {
+                downloader_id,
+                youtube_id,
+                error_message,
+            } => {
+                format!(
+                    "{} failed {} because {}",
+                    downloader_id, youtube_id, error_message
+                )
+            }
+            DownloadResult::DownloadFinished {
+                downloader_id,
+                youtube_id,
+            } => {
+                format!("{} finished {}", downloader_id, youtube_id)
+            }
+        })
+        .map(|str| ListItem::new(vec![Spans::from(Span::raw(str))]))
+        .collect();
 
-        let actor_block = Paragraph::new(actors_column_text)
-            .block(Block::default().title("Block 2").borders(Borders::ALL));
+    let actor_block = Paragraph::new(actors_column_text)
+        .block(Block::default().title("Downloaders").borders(Borders::ALL));
 
-        f.render_widget(progress_block, layout[0]);
-        f.render_widget(actor_block, layout[1]);
-    })?;
+    let results_block = List::new(results_column_text)
+        .block(Block::default().title("Results").borders(Borders::ALL));
 
-    thread::sleep(Duration::from_millis(5000));
-
-    disable_raw_mode()?;
-    execute!(
-        terminal.backend_mut(),
-        LeaveAlternateScreen,
-        DisableMouseCapture
-    )?;
-    terminal.show_cursor()?;
-
-    Ok(())
+    f.render_widget(progress_block, root[0]);
+    f.render_widget(results_block, layout[0]);
+    f.render_widget(actor_block, layout[1]);
 }
 
 fn command_prepare(processes: String, bookmarks: String) -> Result<()> {
@@ -159,7 +179,7 @@ fn command_synchronize(
     let pending = process_repository.get_by_state(ProcessState::Pending)?;
 
     let (process_channel_s, process_channel_r) = crossbeam_channel::unbounded();
-    let (result_channel_s, result_channel_r) = crossbeam_channel::unbounded();
+    let (message_channel_is, message_channel_r) = crossbeam_channel::unbounded();
 
     for p in pending {
         process_channel_s.send(p.youtube_id)?;
@@ -172,11 +192,12 @@ fn command_synchronize(
     for _ in 0..downloader_count {
         let downloader = Downloader::new(
             process_channel_r.clone(),
-            result_channel_s.clone(),
+            message_channel_is.clone(),
             target.clone(),
             tmp.clone(),
             filter.clone(),
         );
+
         let handle = thread::spawn(move || {
             downloader.start();
         });
@@ -187,37 +208,86 @@ fn command_synchronize(
     // This way after all messages are processed it will stop downloaders
     drop(process_channel_s);
 
-    while let Ok(result) = result_channel_r.recv() {
-        match &result {
-            DownloadStatus::DownloadFailed {
-                youtube_id,
-                error_message,
-                downloader_id,
-            } => process_repository.fail(&youtube_id, &error_message),
-            DownloadStatus::DownloadFinished {
-                youtube_id,
-                downloader_id,
-            } => {
-                process_repository.finish(&youtube_id);
-            }
-            DownloadStatus::DownloadSkipped {
-                youtube_id,
-                downloader_id,
-            } => {
-                process_repository.skip(&youtube_id);
+    enable_raw_mode()?;
+    let mut stdout = io::stdout();
+    execute!(stdout, EnterAlternateScreen)?;
+    let backend = CrosstermBackend::new(stdout);
+    let mut terminal = Terminal::new(backend)?;
+
+    let mut downloader_states: HashMap<String, DownloaderState> = HashMap::new();
+    let mut results: Vec<DownloadResult> = vec![];
+
+    terminal.draw(|f| draw_ui(f, &downloader_states, &results))?;
+
+    while let Ok(message) = message_channel_r.recv() {
+        terminal.draw(|f| draw_ui(f, &downloader_states, &results))?;
+
+        if poll(Duration::from_millis(0))? {
+            let event = read()?;
+
+            match event {
+                Event::Key(KeyEvent {
+                    code: KeyCode::Esc, ..
+                }) => break,
+                Event::Key(KeyEvent {
+                    modifiers: KeyModifiers::CONTROL,
+                    code: KeyCode::Char('c'),
+                    ..
+                }) => break,
+                _ => {}
             }
         }
 
-        dbg!(result);
+        match message {
+            DownloaderMessage::Result(result) => {
+                let result_clone = result.clone();
+                results.insert(0, result_clone);
+
+                match result {
+                    DownloadResult::DownloadFailed {
+                        youtube_id,
+                        error_message,
+                        ..
+                    } => process_repository.fail(&youtube_id, &error_message),
+                    DownloadResult::DownloadFinished { youtube_id, .. } => {
+                        process_repository.finish(&youtube_id);
+                    }
+                    DownloadResult::DownloadSkipped { youtube_id, .. } => {
+                        process_repository.skip(&youtube_id);
+                    }
+                }
+            }
+            DownloaderMessage::State(state) => {
+                let state_clone = state.clone();
+                match state {
+                    DownloaderState::Downloading { downloader_id, .. } => {
+                        downloader_states.insert(downloader_id.clone(), state_clone);
+                    }
+                    DownloaderState::Waiting { downloader_id } => {
+                        downloader_states.insert(downloader_id.clone(), state_clone);
+                    }
+                    DownloaderState::Finished { downloader_id } => {
+                        downloader_states.insert(downloader_id.clone(), state_clone);
+                    }
+                    DownloaderState::Crashed { downloader_id } => {
+                        downloader_states.insert(downloader_id.clone(), state_clone);
+                    }
+                }
+            }
+        }
 
         // This is not the best solution to quit this loop
         // but I don't know why the channel disconnects
         let is_workers_done = handles.iter().all(|h| h.is_finished());
-        let is_channel_empty = result_channel_r.is_empty();
+        let is_channel_empty = message_channel_r.is_empty();
         if is_workers_done && is_channel_empty {
             break;
         }
     }
+
+    disable_raw_mode()?;
+    execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
+    terminal.show_cursor()?;
 
     Ok(())
 }

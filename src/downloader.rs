@@ -4,8 +4,8 @@ use anyhow::Result;
 use crossbeam_channel::{Receiver, Sender};
 use nanoid::nanoid;
 
-#[derive(Debug)]
-pub enum DownloadStatus {
+#[derive(Debug, Clone)]
+pub enum DownloadResult {
     DownloadSkipped {
         downloader_id: String,
         youtube_id: String,
@@ -21,7 +21,7 @@ pub enum DownloadStatus {
     },
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum DownloaderState {
     Downloading {
         downloader_id: String,
@@ -33,12 +33,21 @@ pub enum DownloaderState {
     Waiting {
         downloader_id: String,
     },
+    Crashed {
+        downloader_id: String,
+    },
+}
+
+#[derive(Debug)]
+pub enum DownloaderMessage {
+    Result(DownloadResult),
+    State(DownloaderState),
 }
 
 pub struct Downloader {
-    id: String,
+    pub id: String,
     work_channel: Receiver<String>,
-    result_channel: Sender<DownloadStatus>,
+    message_channel: Sender<DownloaderMessage>,
     target: String,
     tmp: String,
     filter: Option<String>,
@@ -47,7 +56,7 @@ pub struct Downloader {
 impl Downloader {
     pub fn new(
         work_channel: Receiver<String>,
-        result_channel: Sender<DownloadStatus>,
+        message_channel: Sender<DownloaderMessage>,
         target: String,
         tmp: String,
         filter: Option<String>,
@@ -55,7 +64,7 @@ impl Downloader {
         Downloader {
             id: nanoid!(5),
             work_channel,
-            result_channel,
+            message_channel,
             target,
             tmp,
             filter,
@@ -63,20 +72,43 @@ impl Downloader {
     }
 
     pub fn start(&self) -> () {
+        self.message_channel
+            .send(DownloaderMessage::State(DownloaderState::Waiting {
+                downloader_id: self.id.clone(),
+            }))
+            .expect("Cannot send downloader state to message channel");
+
         while let Ok(youtube_id) = self.work_channel.recv() {
+            self.message_channel
+                .send(DownloaderMessage::State(DownloaderState::Downloading {
+                    downloader_id: self.id.clone(),
+                    youtube_id: youtube_id.clone(),
+                }))
+                .expect("Cannot send downloader state to message channel");
+
             let result = self.download_yt(youtube_id, &self.target, &self.tmp, &self.filter);
 
             match result {
                 Ok(result) => {
-                    self.result_channel
-                        .send(result)
-                        .expect("Cannot send download result to result channel");
+                    self.message_channel
+                        .send(DownloaderMessage::Result(result))
+                        .expect("Cannot send download result to message channel");
                 }
                 Err(_) => {
-                    todo!()
+                    self.message_channel
+                        .send(DownloaderMessage::State(DownloaderState::Crashed {
+                            downloader_id: self.id.clone(),
+                        }))
+                        .expect("Cannot send downloader state to message channel");
                 }
             }
         }
+
+        self.message_channel
+            .send(DownloaderMessage::State(DownloaderState::Finished {
+                downloader_id: self.id.clone(),
+            }))
+            .expect("Cannot send downloader state to message channel");
     }
 
     pub fn download_yt(
@@ -85,7 +117,7 @@ impl Downloader {
         target_dir: &str,
         tmp_dir: &str,
         match_filter: &Option<String>,
-    ) -> Result<DownloadStatus> {
+    ) -> Result<DownloadResult> {
         let output = {
             if cfg!(target_os = "windows") {
                 todo!("Windows is not supported")
@@ -117,18 +149,18 @@ impl Downloader {
 
         if output.status.success() {
             if is_skipped {
-                Ok(DownloadStatus::DownloadSkipped {
+                Ok(DownloadResult::DownloadSkipped {
                     youtube_id,
                     downloader_id: self.id.clone(),
                 })
             } else {
-                Ok(DownloadStatus::DownloadFinished {
+                Ok(DownloadResult::DownloadFinished {
                     youtube_id,
                     downloader_id: self.id.clone(),
                 })
             }
         } else {
-            Ok(DownloadStatus::DownloadFailed {
+            Ok(DownloadResult::DownloadFailed {
                 youtube_id,
                 error_message: stderr,
                 downloader_id: self.id.clone(),
