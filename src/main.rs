@@ -5,6 +5,7 @@ use std::{
 };
 
 use anyhow::Result;
+use data::NAMES;
 use downloader::{Downloader, DownloaderState};
 use library::firefox_library::FirefoxLibrary;
 use types::{Process, ProcessState};
@@ -20,6 +21,7 @@ use crate::{
 };
 
 mod api;
+mod data;
 mod downloader;
 mod library;
 mod process_repository;
@@ -102,8 +104,9 @@ fn command_synchronize(
 
     let mut handles = vec![];
 
-    for _ in 0..downloader_count {
+    for i in 0..downloader_count {
         let downloader = Downloader::new(
+            NAMES[i].to_string(),
             process_channel_r.clone(),
             message_channel_is.clone(),
             target.clone(),

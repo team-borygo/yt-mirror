@@ -2,7 +2,6 @@ use std::process::Command;
 
 use anyhow::Result;
 use crossbeam_channel::{Receiver, Sender};
-use nanoid::nanoid;
 
 #[derive(Debug, Clone)]
 pub enum DownloadResult {
@@ -55,6 +54,7 @@ pub struct Downloader {
 
 impl Downloader {
     pub fn new(
+        id: String,
         work_channel: Receiver<String>,
         message_channel: Sender<DownloaderMessage>,
         target: String,
@@ -62,7 +62,7 @@ impl Downloader {
         filter: Option<String>,
     ) -> Self {
         Downloader {
-            id: nanoid!(5),
+            id,
             work_channel,
             message_channel,
             target,

@@ -59,6 +59,62 @@ pub fn should_quit() -> Result<bool> {
     }
 }
 
+fn state_to_span<'a>(state: &DownloaderState) -> Span<'a> {
+    match state {
+        DownloaderState::Downloading {
+            downloader_id,
+            youtube_id,
+        } => Span::raw(format!("[{}]: Downloading {}", downloader_id, youtube_id).to_string()),
+        DownloaderState::Finished { downloader_id } => {
+            Span::raw(format!("[{}]: Finished", downloader_id).to_string())
+        }
+        DownloaderState::Waiting { downloader_id } => {
+            Span::raw(format!("[{}]: Waiting", downloader_id).to_string())
+        }
+        DownloaderState::Crashed { downloader_id } => {
+            Span::raw(format!("[{}]: Crashed", downloader_id).to_string())
+        }
+    }
+}
+
+fn result_to_span<'a>(result: &DownloadResult) -> Span<'a> {
+    match result {
+        DownloadResult::DownloadSkipped {
+            downloader_id,
+            youtube_id,
+        } => {
+            let style = Style::default().fg(Color::Gray);
+            Span::styled(format!("[{}] skipped {}", downloader_id, youtube_id), style)
+        }
+        DownloadResult::DownloadFailed {
+            downloader_id,
+            youtube_id,
+            error_message,
+        } => {
+            let style = Style::default().fg(Color::Red);
+
+            Span::styled(
+                format!(
+                    "[{}] failed {} because {}",
+                    downloader_id, youtube_id, error_message
+                ),
+                style,
+            )
+        }
+        DownloadResult::DownloadFinished {
+            downloader_id,
+            youtube_id,
+        } => {
+            let style = Style::default().fg(Color::Green);
+
+            Span::styled(
+                format!("[{}] finished {}", downloader_id, youtube_id),
+                style,
+            )
+        }
+    }
+}
+
 pub fn draw_ui<B: Backend>(
     f: &mut Frame<B>,
     downloader_states: &HashMap<String, DownloaderState>,
@@ -89,58 +145,13 @@ pub fn draw_ui<B: Backend>(
 
     let actors_column_text: Vec<Spans> = downloader_states
         .values()
-        .map(|state| match state {
-            DownloaderState::Downloading {
-                downloader_id,
-                youtube_id,
-            } => format!("{}: Downloading {}", downloader_id, youtube_id).to_string(),
-            DownloaderState::Finished { downloader_id } => {
-                format!("{}: Finished", downloader_id).to_string()
-            }
-            DownloaderState::Waiting { downloader_id } => {
-                format!("{}: Waiting", downloader_id).to_string()
-            }
-            DownloaderState::Crashed { downloader_id } => {
-                format!("{}: Crashed", downloader_id).to_string()
-            }
-        })
-        .map(|str| Spans::from(Span::raw(str)))
+        .map(|state| state_to_span(state))
+        .map(|span| Spans::from(span))
         .collect();
 
     let results_column_text: Vec<ListItem> = results
         .iter()
-        .map(|result| match result {
-            DownloadResult::DownloadSkipped {
-                downloader_id,
-                youtube_id,
-            } => {
-                let style = Style::default().fg(Color::Gray);
-                Span::styled(format!("{} skipped {}", downloader_id, youtube_id), style)
-            }
-            DownloadResult::DownloadFailed {
-                downloader_id,
-                youtube_id,
-                error_message,
-            } => {
-                let style = Style::default().fg(Color::Red);
-
-                Span::styled(
-                    format!(
-                        "{} failed {} because {}",
-                        downloader_id, youtube_id, error_message
-                    ),
-                    style,
-                )
-            }
-            DownloadResult::DownloadFinished {
-                downloader_id,
-                youtube_id,
-            } => {
-                let style = Style::default().fg(Color::Green);
-
-                Span::styled(format!("{} finished {}", downloader_id, youtube_id), style)
-            }
-        })
+        .map(|result| result_to_span(result))
         .map(|span| ListItem::new(vec![Spans::from(span)]))
         .collect();
 
