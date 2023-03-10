@@ -39,6 +39,8 @@ Then run synchronization:
 yt-mirror synchronize -p ./process.sqlite -t ~/music/synchronized --tmp /tmp
 ```
 
+(you can quit synchronization pretty display by pressing CTRL+C or ESC - it may quit after a short while)
+
 `--tmp` defaults to `/tmp` and describes where `youtube-dl` temporary files will be stored.
 
 To show failed synchronizations:
