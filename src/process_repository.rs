@@ -44,9 +44,9 @@ impl ProcessRepository {
 
         connection.execute(
             "CREATE TABLE IF NOT EXISTS process (
-                youtube_id TEXT NOT NULL PRIMARY KEY,
+                youtubeId TEXT NOT NULL PRIMARY KEY,
                 state TEXT NOT NULL,
-                error_message TEXT
+                errorMessage TEXT
               )",
             (),
         )?;
@@ -57,7 +57,7 @@ impl ProcessRepository {
     pub fn get_by_state(&self, state: ProcessState) -> Result<Vec<Process>> {
         let mut stmt = self
             .connection
-            .prepare("SELECT youtube_id, state, error_message FROM process WHERE state = (?1)")?;
+            .prepare("SELECT youtubeId, state, errorMessage FROM process WHERE state = (?1)")?;
 
         let iter = stmt.query_map([state], |row| {
             Ok(Process {
@@ -73,7 +73,7 @@ impl ProcessRepository {
     pub fn finish(&self, id: &str) -> () {
         self.connection
             .execute(
-                "UPDATE process SET state = (?1) WHERE youtube_id = (?2)",
+                "UPDATE process SET state = (?1) WHERE youtubeId = (?2)",
                 (ProcessState::Finished, id.clone()),
             )
             .expect("Marking process as failed was not successful");
@@ -82,7 +82,7 @@ impl ProcessRepository {
     pub fn fail(&self, id: &str, error: &str) -> () {
         self.connection
             .execute(
-                "UPDATE process SET state = (?1), error_message = (?2) WHERE youtube_id = (?3)",
+                "UPDATE process SET state = (?1), errorMessage = (?2) WHERE youtubeId = (?3)",
                 (ProcessState::Failed, error.clone(), id.clone()),
             )
             .expect("Marking process as failed was not successful");
@@ -91,7 +91,7 @@ impl ProcessRepository {
     pub fn skip(&self, id: &str) -> () {
         self.connection
             .execute(
-                "UPDATE process SET state = (?1) WHERE youtube_id = (?2)",
+                "UPDATE process SET state = (?1) WHERE youtubeId = (?2)",
                 (ProcessState::Skipped, id.clone()),
             )
             .expect("Marking process as skipped was not successful");
@@ -102,7 +102,7 @@ impl ProcessRepository {
 
         for process in processes {
             tx.execute(
-                "INSERT OR IGNORE INTO process (youtube_id, state, error_message) VALUES (?1, ?2, ?3)",
+                "INSERT OR IGNORE INTO process (youtubeId, state, errorMessage) VALUES (?1, ?2, ?3)",
                 (process.youtube_id.clone(), process.state.clone(), process.error.clone())
             )?;
         }
