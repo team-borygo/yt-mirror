@@ -145,6 +145,7 @@ fn command_synchronize(
 
                 let result_clone = result.clone();
                 results.insert(0, result_clone);
+                results.truncate(40);
 
                 match result {
                     DownloadResult::DownloadFailed {
