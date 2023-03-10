@@ -1,6 +1,9 @@
 [package]
 name = "yt-mirror"
 version = "1.0.1"
+description = "Loads browser bookmarks, and downloads all youtube videos converting them to music files"
+license = "GPL-3.0"
+repository = "https://github.com/team-borygo/yt-mirror"
 edition = "2021"
 
 [dependencies]
