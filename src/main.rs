@@ -84,6 +84,11 @@ fn command_synchronize(
     let pending = process_repository.get_by_state(ProcessState::Pending)?;
     let pending_count = pending.len();
 
+    if pending_count == 0 {
+        println!("No pending bookmarks to synchronize");
+        return Ok(());
+    }
+
     let (process_channel_s, process_channel_r) = crossbeam_channel::unbounded();
     let (message_channel_is, message_channel_r) = crossbeam_channel::unbounded();
 
