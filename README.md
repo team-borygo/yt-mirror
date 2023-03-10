@@ -23,7 +23,9 @@ Currently it works only on Linux (dependency on `mv` command - for Windows chang
 
 ## Installation
 
-Download binary from GitHub Release page or build from source using Cabal.
+Requires Cargo (Rust)
+
+`cargo install yt-mirror`
 
 ## Usage
 
