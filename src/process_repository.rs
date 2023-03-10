@@ -1,7 +1,7 @@
 use std::str::from_utf8;
 
 use anyhow::Result;
-use rusqlite::{Connection, ToSql, types::FromSql};
+use rusqlite::{types::FromSql, Connection, ToSql};
 
 use crate::types::{Process, ProcessState};
 
@@ -30,10 +30,10 @@ impl FromSql for ProcessState {
                     "failed" => Ok(ProcessState::Failed),
                     "finished" => Ok(ProcessState::Finished),
                     "skipped" => Ok(ProcessState::Skipped),
-                    _ => panic!("Unknown state value for ProcessState")
+                    _ => panic!("Unknown state value for ProcessState"),
                 }
-            },
-            _ => panic!("Unknown column type for ProcessState")
+            }
+            _ => panic!("Unknown column type for ProcessState"),
         }
     }
 }
@@ -51,31 +51,13 @@ impl ProcessRepository {
             (),
         )?;
 
-        Ok(ProcessRepository {
-            connection
-        })
-    }
-
-    pub fn get_all(&self) -> Result<Vec<Process>> {
-        let mut stmt = self.connection.prepare(
-            "SELECT youtube_id, state, error_message FROM process"
-        )?;
-
-        let iter = stmt.query_map([], |row| {
-            Ok(Process {
-                youtube_id: row.get(0)?,
-                state: row.get(1)?,
-                error: row.get(2)?,
-            })
-        })?;
-
-        Ok(iter.map(|p| p.unwrap()).collect())  
+        Ok(ProcessRepository { connection })
     }
 
     pub fn get_by_state(&self, state: ProcessState) -> Result<Vec<Process>> {
-        let mut stmt = self.connection.prepare(
-            "SELECT youtube_id, state, error_message FROM process WHERE state = (?1)"
-        )?;
+        let mut stmt = self
+            .connection
+            .prepare("SELECT youtube_id, state, error_message FROM process WHERE state = (?1)")?;
 
         let iter = stmt.query_map([state], |row| {
             Ok(Process {
@@ -89,24 +71,30 @@ impl ProcessRepository {
     }
 
     pub fn finish(&self, id: &str) -> () {
-        self.connection.execute(
-            "UPDATE process SET state = (?1) WHERE youtube_id = (?2)",
-            (ProcessState::Finished, id.clone())
-        ).expect("Marking process as failed was not successful");
+        self.connection
+            .execute(
+                "UPDATE process SET state = (?1) WHERE youtube_id = (?2)",
+                (ProcessState::Finished, id.clone()),
+            )
+            .expect("Marking process as failed was not successful");
     }
 
     pub fn fail(&self, id: &str, error: &str) -> () {
-        self.connection.execute(
-            "UPDATE process SET state = (?1), error_message = (?2) WHERE youtube_id = (?3)",
-            (ProcessState::Failed, error.clone(), id.clone())
-        ).expect("Marking process as failed was not successful");
+        self.connection
+            .execute(
+                "UPDATE process SET state = (?1), error_message = (?2) WHERE youtube_id = (?3)",
+                (ProcessState::Failed, error.clone(), id.clone()),
+            )
+            .expect("Marking process as failed was not successful");
     }
 
     pub fn skip(&self, id: &str) -> () {
-        self.connection.execute(
-            "UPDATE process SET state = (?1) WHERE youtube_id = (?2)",
-            (ProcessState::Skipped, id.clone())
-        ).expect("Marking process as skipped was not successful");
+        self.connection
+            .execute(
+                "UPDATE process SET state = (?1) WHERE youtube_id = (?2)",
+                (ProcessState::Skipped, id.clone()),
+            )
+            .expect("Marking process as skipped was not successful");
     }
 
     pub fn save_many(&mut self, processes: &Vec<Process>) -> Result<()> {
@@ -124,4 +112,3 @@ impl ProcessRepository {
         Ok(())
     }
 }
-
