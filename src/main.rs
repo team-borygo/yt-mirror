@@ -70,6 +70,8 @@ fn command_prepare(processes: String, bookmarks: String) -> Result<()> {
 
     process_repository.save_many(&process_list)?;
 
+    println!("Bookmarks prepared ({} overall)!", process_list.len());
+
     Ok(())
 }
 

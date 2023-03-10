@@ -1,7 +1,7 @@
-use std::{fs};
+use std::fs;
 
 use anyhow::Result;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 use crate::types::Bookmark;
 
@@ -11,7 +11,6 @@ pub struct ChromiumLibrary;
 
 impl Library for ChromiumLibrary {
     fn get_bookmarks(&self, path: &std::path::Path) -> Result<Vec<Bookmark>> {
-        println!("{:?}", path);
         let data = fs::read_to_string(path)?;
         let json = serde_json::from_str(&data)?;
 
@@ -21,7 +20,10 @@ impl Library for ChromiumLibrary {
 
 fn parse_bookmarks(entry: &ChromiumBookmark) -> Vec<Bookmark> {
     if let Some(children) = &entry.children {
-        children.iter().flat_map(|child| parse_bookmarks(child)).collect()
+        children
+            .iter()
+            .flat_map(|child| parse_bookmarks(child))
+            .collect()
     } else {
         if let Some(url) = &entry.url {
             vec![Bookmark {
@@ -35,24 +37,23 @@ fn parse_bookmarks(entry: &ChromiumBookmark) -> Vec<Bookmark> {
 }
 
 fn collect_bookmarks(core: ChromiumBookmarkCore) -> Vec<Bookmark> {
-    return [
-        core.roots.bookmark_bar,
-        core.roots.other
-    ].iter().flat_map(|b| parse_bookmarks(b)).collect()
+    return [core.roots.bookmark_bar, core.roots.other]
+        .iter()
+        .flat_map(|b| parse_bookmarks(b))
+        .collect();
 }
 
 #[derive(Serialize, Deserialize)]
 struct ChromiumBookmarkCore {
-    roots: ChromiumBookmarkRoots
+    roots: ChromiumBookmarkRoots,
 }
-
 
 // @TODO We could differentiate between different bookmark types (folder and url)
 #[derive(Serialize, Deserialize)]
 struct ChromiumBookmarkRoots {
     bookmark_bar: ChromiumBookmark,
     other: ChromiumBookmark,
-    synced: ChromiumBookmark
+    synced: ChromiumBookmark,
 }
 
 #[derive(Serialize, Deserialize)]
