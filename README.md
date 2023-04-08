@@ -8,7 +8,7 @@ It runs incrementally, so you can synchronize videos as they are added up - only
 
 **This tool is still in active development**
 
-Currently it works only on Linux (dependency on `mv` command - for Windows change `mv` to `move` in `Downloader.hs`).
+Currently it works only on Linux.
 
 ## Supported browsers
 
@@ -17,7 +17,6 @@ Currently it works only on Linux (dependency on `mv` command - for Windows chang
 
 ## Requirements
 
-- sqlite3
 - ffmpeg
 - yt-dlp
 
