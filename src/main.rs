@@ -21,6 +21,7 @@ use crate::{
 };
 
 mod api;
+mod config;
 mod data;
 mod downloader;
 mod library;
@@ -133,11 +134,11 @@ fn command_synchronize(
     terminal.draw(|f| draw_ui(f, &downloader_states, &results, &progress))?;
 
     while let Ok(message) = message_channel_r.recv() {
-        terminal.draw(|f| draw_ui(f, &downloader_states, &results, &progress))?;
-
         if should_quit()? {
             break;
         }
+
+        terminal.draw(|f| draw_ui(f, &downloader_states, &results, &progress))?;
 
         match message {
             DownloaderMessage::Result(result) => {

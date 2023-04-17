@@ -1,7 +1,6 @@
-use std::process::Command;
-
 use anyhow::Result;
 use crossbeam_channel::{Receiver, Sender};
+use std::process::Command;
 
 #[derive(Debug, Clone)]
 pub enum DownloadResult {
