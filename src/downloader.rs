@@ -1,6 +1,6 @@
 use anyhow::Result;
 use crossbeam_channel::{Receiver, Sender};
-use std::process::Command;
+use std::{path::PathBuf, process::Command};
 
 #[derive(Debug, Clone)]
 pub enum DownloadResult {
@@ -46,8 +46,8 @@ pub struct Downloader {
     pub id: String,
     work_channel: Receiver<String>,
     message_channel: Sender<DownloaderMessage>,
-    target: String,
-    tmp: String,
+    target: PathBuf,
+    tmp: PathBuf,
     filter: Option<String>,
 }
 
@@ -56,8 +56,8 @@ impl Downloader {
         id: String,
         work_channel: Receiver<String>,
         message_channel: Sender<DownloaderMessage>,
-        target: String,
-        tmp: String,
+        target: PathBuf,
+        tmp: PathBuf,
         filter: Option<String>,
     ) -> Self {
         Downloader {
@@ -113,8 +113,8 @@ impl Downloader {
     pub fn download_yt(
         &self,
         youtube_id: String,
-        target_dir: &str,
-        tmp_dir: &str,
+        target_dir: &PathBuf,
+        tmp_dir: &PathBuf,
         match_filter: &Option<String>,
     ) -> Result<DownloadResult> {
         let output = {
@@ -124,10 +124,10 @@ impl Downloader {
                 let mut args = vec![
                     "-x".to_string(),
                     "-o".to_string(),
-                    format!("{}/%(title)s.%(ext)s", tmp_dir),
+                    format!("{}/%(title)s.%(ext)s", tmp_dir.display()),
                     "--no-warnings".to_string(),
                     "--exec".to_string(),
-                    format!("mv {{}} {}/", target_dir),
+                    format!("mv {{}} {}/", target_dir.display()),
                 ];
 
                 if let Some(filter) = match_filter {
