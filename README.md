@@ -8,7 +8,7 @@ It runs incrementally, so you can synchronize videos as they are added up - only
 
 **This tool is still in active development**
 
-Currently it works only on Linux.
+Currently it works only on Linux (dependency on `mv` command, and Linux directory structure for data location, and defaults).
 
 ## Supported browsers
 
@@ -28,39 +28,43 @@ Requires Cargo (Rust)
 
 ## Usage
 
-Start by preparing bookmarks to synchronize (`places.sqlite` is treated as Firefox bookmarks, `Bookmarks[.json]` is treated as Chromium-alike bookmarks):
+Start by running the command `yt-mirror` once, without any arguments.
 
 ```sh
-yt-mirror prepare -p ./process.sqlite -b ./places.sqlite
+yt-mirror
+```
+
+It should create default config in `~/.config/yt-mirror/config.toml`.
+Inside, you should modify `target_dir` (where your music will be downloaded) and `bookmark_files` list (see [Bookmarks location](#bookmarks-location)). At least one `bookmarks_files` entry must be provided.
+
+Example minimal config:
+
+```toml
+bookmark_files = ["~/.config/BraveSoftware/Brave-Browser/Default/Bookmarks"]
+target_dir = "~/music"
+```
+
+Then prepare bookmarks to synchronize:
+
+```sh
+yt-mirror prepare
 ```
 
 Then run synchronization:
 
 ```sh
-yt-mirror synchronize -p ./process.sqlite -t ~/music/synchronized --tmp /tmp
+yt-mirror synchronize
 ```
 
-(you can quit synchronization pretty display by pressing CTRL+C or ESC - it may quit after a short while)
-
-`--tmp` defaults to `/tmp` and describes where `youtube-dl` temporary files will be stored.
+(you can quit synchronization by pressing CTRL+C or ESC)
 
 To show failed synchronizations:
 
 ```sh
-yt-mirror failed -p ./process.sqlite [-s/--short]
+yt-mirror failed [-s/--short]
 ```
 
 `-s`/`--short` prints only failed YouTube ids without any decorations
-
-### Using multiple bookmarks sources
-
-Because `prepare` step is separated, and videos to synchronize are stored with video id, you can use multiple sources of bookmarks to prepare, just by
-running `prepare` step multiple times. For example to synchronize bookmarks from Firefox and Chrome:
-
-```sh
-yt-mirror prepare -p ./process.sqlite -b [...]/places.sqlite
-yt-mirror prepare -p ./process.sqlite -b [...]/Bookmarks
-```
 
 ### Filtering videos to download
 
@@ -72,7 +76,7 @@ If video is filtered its process will be marked as "skipped".
 Example - to download only videos with duration lower than 1000s:
 
 ```
-yt-mirror synchronize -p ./process.sqlite -t ~/music/synchronized --filter "duration < 1000"
+yt-mirror synchronize --filter "duration < 1000"
 ```
 
 ## Bookmarks locations
@@ -82,4 +86,4 @@ yt-mirror synchronize -p ./process.sqlite -t ~/music/synchronized --filter "dura
 Firefox | `~/.mozilla/firefox/*/places.sqlite` | `%appdata%\Mozilla\Firefox\Profiles\*\places.sqlite`
 Chrome | `~/.config/google-chrome/Default/Bookmarks` | `%appdata%\..\Local\Google\Chrome\User Data\Default\Bookmarks`
 Chromium | `~/.config/chromium/Default/Bookmarks` | ?
-Brave | `~/.config/BraveSoftware/Brave-Browser/Default/Bookmarks` | ?
+Brave | `~/.config/BraveSoftware/Brave-Browser/Default/Bookmarks` | `%appdata%\..\Local\BraveSoftware\Brave-Browser\User Data\Default`
