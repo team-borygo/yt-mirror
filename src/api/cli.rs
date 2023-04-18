@@ -29,6 +29,14 @@ pub enum CliCommand {
             help = "Options for --match-filter (https://github.com/ytdl-org/youtube-dl/blob/master/README.md#video-selection)"
         )]
         filter: Option<String>,
+
+        #[arg(
+            short,
+            long,
+            help = "Retry failed synchronizations (default: false)",
+            default_value_t = false
+        )]
+        retry: bool,
     },
     #[command(about = "Prints failed processes")]
     Failed {
