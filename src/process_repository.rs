@@ -1,4 +1,4 @@
-use std::str::from_utf8;
+use std::{path::PathBuf, str::from_utf8};
 
 use anyhow::Result;
 use rusqlite::{types::FromSql, Connection, ToSql};
@@ -39,7 +39,7 @@ impl FromSql for ProcessState {
 }
 
 impl ProcessRepository {
-    pub fn new(db_path: &str) -> Result<Self> {
+    pub fn new(db_path: PathBuf) -> Result<Self> {
         let connection = Connection::open(db_path)?;
 
         connection.execute(
