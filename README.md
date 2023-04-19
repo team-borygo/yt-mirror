@@ -66,6 +66,12 @@ yt-mirror failed [-s/--short]
 
 `-s`/`--short` prints only failed YouTube ids without any decorations
 
+If synchronization fail you can always try synchronizing failed bookmarks using `-r`/`--retry`:
+
+```sh
+yt-mirror synchronize -r
+```
+
 ### Filtering videos to download
 
 Using `--filter` user can utilise full power of [youtube-dl --match-filter](https://github.com/ytdl-org/youtube-dl/blob/master/README.md#video-selection).

@@ -39,7 +39,7 @@ fn main() -> Result<()> {
 
     match program.command {
         CliCommand::Prepare {} => command_prepare(&config),
-        CliCommand::Synchronize { filter } => command_synchronize(&config, filter),
+        CliCommand::Synchronize { filter, retry } => command_synchronize(&config, filter, retry),
         CliCommand::Failed { short } => command_failed(&config, short),
     }
 }
@@ -83,13 +83,23 @@ fn command_prepare(config: &Config) -> Result<()> {
         .collect()
 }
 
-fn command_synchronize(config: &Config, filter: Option<String>) -> Result<()> {
+fn command_synchronize(config: &Config, filter: Option<String>, retry: bool) -> Result<()> {
     let process_repository = ProcessRepository::new(config.get_process_path())?;
 
-    let pending = process_repository.get_by_state(ProcessState::Pending)?;
-    let pending_count = pending.len();
+    let processes = {
+        let pending = process_repository.get_by_state(ProcessState::Pending)?;
 
-    if pending_count == 0 {
+        if retry {
+            let failed = process_repository.get_by_state(ProcessState::Failed)?;
+            failed.into_iter().chain(pending.into_iter()).collect()
+        } else {
+            pending
+        }
+    };
+
+    let process_count = processes.len();
+
+    if process_count == 0 {
         println!("No pending bookmarks to synchronize");
         return Ok(());
     }
@@ -97,7 +107,7 @@ fn command_synchronize(config: &Config, filter: Option<String>) -> Result<()> {
     let (process_channel_s, process_channel_r) = crossbeam_channel::unbounded();
     let (message_channel_is, message_channel_r) = crossbeam_channel::unbounded();
 
-    for p in pending {
+    for p in processes {
         process_channel_s.send(p.youtube_id)?;
     }
 
@@ -129,7 +139,7 @@ fn command_synchronize(config: &Config, filter: Option<String>) -> Result<()> {
 
     let mut downloader_states: HashMap<String, DownloaderState> = HashMap::new();
     let mut results: Vec<DownloadResult> = vec![];
-    let mut progress: (u32, u32) = (0, pending_count.try_into()?);
+    let mut progress: (u32, u32) = (0, process_count.try_into()?);
 
     terminal.draw(|f| draw_ui(f, &downloader_states, &results, &progress))?;
 
