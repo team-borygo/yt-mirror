@@ -1,0 +1,3 @@
+bookmark_files = ["~/.config/BraveSoftware/Brave-Browser/Default/Bookmarks"]
+target_dir = "/tmp"
+data_dir = "./example/yt-mirror-data"
