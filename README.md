@@ -85,6 +85,29 @@ Example - to download only videos with duration lower than 1000s:
 yt-mirror synchronize --filter "duration < 1000"
 ```
 
+### Configuration
+
+You can pass custom configuration file location to any command using `-c`/`--config` parameter:
+
+```sh
+yt-mirror prepare -c ~/my-config-location.toml
+```
+
+Example full config:
+
+```toml
+# List of bookmark files to prepare (and eventually synchronize)
+bookmark_files = ["~/.config/BraveSoftware/Brave-Browser/Default/Bookmarks"]
+# target_dir is where your files will be moved after downloading
+target_dir = "~/music"
+# data_dir is used to store process bookmarks, and for other persistent data
+# default: $XDG_DATA_HOME/yt-mirror or ~/.local/share/yt-mirror
+data_dir = "~/my-data-dir"
+# tmp_dir is used as location for temporary files
+# default: /tmp
+tmp_dir = "~/my-tmp-dir"
+```
+
 ## Bookmarks locations
 
 . | Linux | Windows

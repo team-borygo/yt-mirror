@@ -20,7 +20,15 @@ pub enum CliCommand {
     #[command(
         about = "Take bookmarks, and prepare them to synchronization, by saving in process database"
     )]
-    Prepare {},
+    Prepare {
+        #[arg(
+            long,
+            short,
+            value_name = "FILE_PATH",
+            help = "Custom path to config file"
+        )]
+        config: Option<String>,
+    },
     #[command(about = "Synchronize all pending bookmarks")]
     Synchronize {
         #[arg(
@@ -37,10 +45,26 @@ pub enum CliCommand {
             default_value_t = false
         )]
         retry: bool,
+
+        #[arg(
+            long,
+            short,
+            value_name = "FILE_PATH",
+            help = "Custom path to config file"
+        )]
+        config: Option<String>,
     },
     #[command(about = "Prints failed processes")]
     Failed {
         #[arg(short, long, help = "List only failed YouTube ids without decorations")]
         short: bool,
+
+        #[arg(
+            long,
+            short,
+            value_name = "FILE_PATH",
+            help = "Custom path to config file"
+        )]
+        config: Option<String>,
     },
 }

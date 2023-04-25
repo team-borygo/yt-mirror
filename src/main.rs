@@ -4,7 +4,7 @@ use std::{
     thread::{self},
 };
 
-use anyhow::{Error, Result};
+use anyhow::Result;
 use config::config::Config;
 use data::NAMES;
 use downloader::{Downloader, DownloaderState};
@@ -32,15 +32,26 @@ mod ui;
 mod youtube;
 
 fn main() -> Result<()> {
-    let config = Config::new_from_directory()?;
-
     let cli = Cli {};
     let program = cli.run();
 
     match program.command {
-        CliCommand::Prepare {} => command_prepare(&config),
-        CliCommand::Synchronize { filter, retry } => command_synchronize(&config, filter, retry),
-        CliCommand::Failed { short } => command_failed(&config, short),
+        CliCommand::Prepare { config } => {
+            let config = Config::new_from_file(config)?;
+            command_prepare(&config)
+        }
+        CliCommand::Synchronize {
+            filter,
+            retry,
+            config,
+        } => {
+            let config = Config::new_from_file(config)?;
+            command_synchronize(&config, filter, retry)
+        }
+        CliCommand::Failed { short, config } => {
+            let config = Config::new_from_file(config)?;
+            command_failed(&config, short)
+        }
     }
 }
 

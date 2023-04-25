@@ -7,27 +7,39 @@ use super::app_config::AppConfig;
 
 pub struct Config {
     config_file: PathBuf,
-    config_directory: PathBuf,
-    data_directory: PathBuf,
     app_config: AppConfig,
 }
 
 impl Config {
-    pub fn new_from_directory() -> Result<Config> {
+    pub fn new_from_file(config_path: Option<String>) -> Result<Config> {
         if cfg!(target_os = "windows") {
             todo!("Windows is not supported")
         } else {
-            let config_directory_root =
-                std::env::var("XDG_CONFIG_HOME").unwrap_or("~/.config".to_string());
-            let data_directory_root =
-                std::env::var("XDG_DATA_HOME").unwrap_or("~/.local/share".to_string());
+            if let Some(config_path) = config_path {
+                let config_path = PathBuf::from(config_path);
 
-            let config_directory = PathBuf::from(config_directory_root).join("yt-mirror");
-            let data_directory = PathBuf::from(data_directory_root).join("yt-mirror");
-            let config_file = config_directory.join("config.toml");
+                Config::new(config_path)
+            } else {
+                Config::new_default()
+            }
+        }
+    }
 
-            ensure_dir(&data_directory)?;
-            ensure_dir(&config_directory)?;
+    pub fn new_default() -> Result<Config> {
+        let config_directory_root =
+            std::env::var("XDG_CONFIG_HOME").unwrap_or("~/.config".to_string());
+
+        let config_directory = PathBuf::from(config_directory_root).join("yt-mirror");
+        let config_file = config_directory.join("config.toml");
+
+        Config::new(config_file)
+    }
+
+    fn new(config_file: PathBuf) -> Result<Config> {
+        if cfg!(target_os = "windows") {
+            todo!("Windows is not supported")
+        } else {
+            ensure_dir(&PathBuf::from(config_file.parent().unwrap()))?;
 
             let app_config: AppConfig = {
                 let file_content = ensure_file(
@@ -40,17 +52,17 @@ impl Config {
 
             let config = Config {
                 config_file,
-                config_directory,
-                data_directory,
                 app_config,
             };
+
+            ensure_dir(&config.get_data_dir())?;
 
             config.validate().and(Ok(config))
         }
     }
 
     pub fn get_process_path(&self) -> PathBuf {
-        self.data_directory.join("processes.sqlite")
+        self.get_data_dir().join("processes.sqlite")
     }
 
     pub fn get_tmp_dir(&self) -> PathBuf {
@@ -75,10 +87,23 @@ impl Config {
         self.app_config.target_dir.expand_home().unwrap()
     }
 
+    pub fn get_data_dir(&self) -> PathBuf {
+        let data_directory_root =
+            std::env::var("XDG_DATA_HOME").unwrap_or("~/.local/share".to_string());
+        let default = PathBuf::from(data_directory_root).join("yt-mirror");
+
+        self.app_config
+            .data_dir
+            .as_ref()
+            .map(|p| p.expand_home().unwrap()) // Not sure how to handle that error
+            .unwrap_or(default)
+    }
+
     pub fn validate(&self) -> Result<()> {
         let target_dir = self.get_target_dir();
         let tmp_dir = self.get_tmp_dir();
         let bookmark_files = self.get_bookmark_files();
+        let data_dir = self.get_data_dir();
 
         if !target_dir.exists() {
             return Err(anyhow!(
@@ -92,6 +117,14 @@ impl Config {
             return Err(anyhow!(
                 "Given tmp_dir (\"{}\") doesn't exist (config file path: \"{}\")",
                 tmp_dir.display(),
+                self.config_file.display()
+            ));
+        }
+
+        if !data_dir.exists() {
+            return Err(anyhow!(
+                "Given data_dir (\"{}\") doesn't exist (config file path: \"{}\")",
+                data_dir.display(),
                 self.config_file.display()
             ));
         }
@@ -140,16 +173,21 @@ mod validation {
 
     use super::Config;
 
+    fn initialize() -> () {
+        std::fs::create_dir_all(&PathBuf::from("./example/yt-mirror-data")).unwrap();
+    }
+
     #[test]
     fn it_should_reject_not_existing_target_dir() -> () {
+        initialize();
+
         let config = Config {
-            config_directory: PathBuf::new(),
             config_file: PathBuf::new(),
-            data_directory: PathBuf::new(),
             app_config: AppConfig {
                 bookmark_files: vec!["/tmp".to_string()],
                 tmp_dir: None,
                 target_dir: "/foobar".to_string(),
+                data_dir: Some("./example/yt-mirror-data".to_string()),
             },
         };
 
@@ -158,14 +196,15 @@ mod validation {
 
     #[test]
     fn it_should_reject_not_existing_tmp_dir() -> () {
+        initialize();
+
         let config = Config {
-            config_directory: PathBuf::new(),
             config_file: PathBuf::new(),
-            data_directory: PathBuf::new(),
             app_config: AppConfig {
                 bookmark_files: vec!["/tmp".to_string()],
                 tmp_dir: Some("/foobar".to_string()),
                 target_dir: "/tmp".to_string(),
+                data_dir: Some("./example/yt-mirror-data".to_string()),
             },
         };
 
@@ -174,14 +213,15 @@ mod validation {
 
     #[test]
     fn it_should_reject_empty_bookmark_files() -> () {
+        initialize();
+
         let config = Config {
-            config_directory: PathBuf::new(),
             config_file: PathBuf::new(),
-            data_directory: PathBuf::new(),
             app_config: AppConfig {
                 bookmark_files: vec![],
                 tmp_dir: None,
                 target_dir: "/tmp".to_string(),
+                data_dir: Some("./example/yt-mirror-data".to_string()),
             },
         };
 
@@ -190,14 +230,15 @@ mod validation {
 
     #[test]
     fn it_should_reject_not_existing_bookmark_files() -> () {
+        initialize();
+
         let config = Config {
-            config_directory: PathBuf::new(),
             config_file: PathBuf::new(),
-            data_directory: PathBuf::new(),
             app_config: AppConfig {
                 bookmark_files: vec!["/tmp".to_string(), "/foobar".to_string()],
                 tmp_dir: None,
                 target_dir: "/tmp".to_string(),
+                data_dir: Some("./example/yt-mirror-data".to_string()),
             },
         };
 
@@ -206,14 +247,15 @@ mod validation {
 
     #[test]
     fn it_should_accept_correct_config() -> () {
+        initialize();
+
         let config = Config {
-            config_directory: PathBuf::new(),
             config_file: PathBuf::new(),
-            data_directory: PathBuf::new(),
             app_config: AppConfig {
                 bookmark_files: vec!["/tmp".to_string()],
                 tmp_dir: None,
                 target_dir: "/tmp".to_string(),
+                data_dir: Some("./example/yt-mirror-data".to_string()),
             },
         };
 
