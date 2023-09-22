@@ -37,7 +37,7 @@ fn parse_bookmarks(entry: &ChromiumBookmark) -> Vec<Bookmark> {
 }
 
 fn collect_bookmarks(core: ChromiumBookmarkCore) -> Vec<Bookmark> {
-    return [core.roots.bookmark_bar, core.roots.other]
+    return [core.roots.bookmark_bar, core.roots.other, core.roots.synced]
         .iter()
         .flat_map(|b| parse_bookmarks(b))
         .collect();
