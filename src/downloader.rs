@@ -122,6 +122,7 @@ impl Downloader {
                 todo!("Windows is not supported")
             } else {
                 let mut args = vec![
+                    "--no-mtime".to_string(),
                     "-x".to_string(),
                     "-o".to_string(),
                     format!("{}/%(title)s.%(ext)s", tmp_dir.display()),
